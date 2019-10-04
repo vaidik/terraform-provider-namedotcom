@@ -56,11 +56,12 @@ func resourceNamedotcomRecord() *schema.Resource {
         }
 }
 
-func makeClient (d *schema.ResourceData) (*namecom.NameCom, error) {
-    user := d.Get("user")
-    token := d.Get("token")
+func makeClient (d *schema.ResourceData, m interface{}) (*namecom.NameCom, error) {
+    user := m.(*Config).User
+    token := m.(*Config).Token
 
-    client := namecom.New(user.(string), token.(string))
+    log.Printf("user %s and token %s", user, token)
+    client := namecom.New(user, token)
     _, err := client.HelloFunc(&namecom.HelloRequest{})
     if err != nil {
         log.Printf("Error connecting with Name.com API")
@@ -93,8 +94,8 @@ func makeRecord(d *schema.ResourceData) *namecom.Record {
     return &record
 }
 
-func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) error {
-    client, _ := makeClient(d)
+func resourceNamedotcomRecordCreate(d *schema.ResourceData, m interface{}) error {
+    client, _ := makeClient(d, m)
     record, err := client.CreateRecord(makeRecord(d))
 
     if err != nil {
@@ -104,11 +105,11 @@ func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) er
     d.SetId(record.Fqdn)
     d.Set("record_id", record.ID)
 
-    return resourceNamedotcomRecordRead(d, meta)
+    return resourceNamedotcomRecordRead(d, m)
 }
 
 func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
-    client, _ := makeClient(d)
+    client, _ := makeClient(d, m)
     domainName := d.Get("domain_name").(string)
     id := d.Get("record_id").(int)
 
@@ -135,7 +136,7 @@ func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceNamedotcomRecordUpdate(d *schema.ResourceData, m interface{}) error {
-    client, _ := makeClient(d)
+    client, _ := makeClient(d, m)
     record, err := client.UpdateRecord(makeRecord(d))
 
     if err != nil {
@@ -149,7 +150,7 @@ func resourceNamedotcomRecordUpdate(d *schema.ResourceData, m interface{}) error
 }
 
 func resourceNamedotcomRecordDelete(d *schema.ResourceData, m interface{}) error {
-    client, _ := makeClient(d)
+    client, _ := makeClient(d, m)
     domainName := d.Get("domain_name").(string)
     id := d.Get("record_id").(int)
 

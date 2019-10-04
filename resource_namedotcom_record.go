@@ -3,7 +3,6 @@ package main
 import (
         "fmt"
         "log"
-        "strconv"
 
         "github.com/hashicorp/terraform-plugin-sdk/helper/schema"
         "github.com/namedotcom/go/namecom"
@@ -18,7 +17,7 @@ func resourceNamedotcomRecord() *schema.Resource {
 
                 Schema: map[string]*schema.Schema{
                         "record_id": {
-                            Type:     schema.TypeString,
+                            Type:     schema.TypeInt,
                             Optional: true,
                             Computed: true,
                         },
@@ -70,8 +69,7 @@ func makeClient (d *schema.ResourceData) (*namecom.NameCom, error) {
     return client, err
 }
 
-func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) error {
-    client, _ := makeClient(d)
+func makeRecord(d *schema.ResourceData) *namecom.Record {
     domainName := d.Get("domain_name").(string)
     host := ""
     hostValue, hostOk := d.GetOk("host"); if hostOk {
@@ -80,19 +78,31 @@ func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) er
     record_type := d.Get("type").(string)
     answer := d.Get("answer").(string)
 
-    record, err := client.CreateRecord(&namecom.Record{
+    record := namecom.Record{
         DomainName: domainName,
         Host: host,
         Type: record_type,
         Answer: answer,
-    })
+    }
+
+    recordId, recordOk := d.GetOk("record_id");
+    if recordOk {
+        record.ID = int32(recordId.(int))
+    }
+
+    return &record
+}
+
+func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) error {
+    client, _ := makeClient(d)
+    record, err := client.CreateRecord(makeRecord(d))
 
     if err != nil {
         return fmt.Errorf("Failed to create record: %s", err)
     }
 
     d.SetId(record.Fqdn)
-    d.Set("record_id", fmt.Sprintf("%v", record.ID))
+    d.Set("record_id", record.ID)
 
     return resourceNamedotcomRecordRead(d, meta)
 }
@@ -100,7 +110,7 @@ func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) er
 func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
     client, _ := makeClient(d)
     domainName := d.Get("domain_name").(string)
-    id, _ := strconv.ParseInt(d.Get("record_id").(string), 10, 32) //, 10, 32)
+    id := d.Get("record_id").(int)
 
     record, err := client.GetRecord(&namecom.GetRecordRequest{
         DomainName: domainName,
@@ -113,6 +123,7 @@ func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
     }
 
     d.SetId(record.Fqdn)
+    d.Set("record_id", record.ID)
     d.Set("domain_name", record.DomainName)
     d.Set("host", record.Host)
     d.Set("type", record.Type)
@@ -124,13 +135,23 @@ func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
 }
 
 func resourceNamedotcomRecordUpdate(d *schema.ResourceData, m interface{}) error {
-        return resourceNamedotcomRecordRead(d, m)
+    client, _ := makeClient(d)
+    record, err := client.UpdateRecord(makeRecord(d))
+
+    if err != nil {
+        return fmt.Errorf("Failed to update record: %s", err)
+    }
+
+    d.SetId(record.Fqdn)
+    d.Set("record_id", record.ID)
+
+    return resourceNamedotcomRecordRead(d, m)
 }
 
 func resourceNamedotcomRecordDelete(d *schema.ResourceData, m interface{}) error {
     client, _ := makeClient(d)
     domainName := d.Get("domain_name").(string)
-    id, _ := strconv.ParseInt(d.Get("record_id").(string), 10, 32) //, 10, 32)
+    id := d.Get("record_id").(int)
 
     _, err := client.DeleteRecord(&namecom.DeleteRecordRequest{
         DomainName: domainName,

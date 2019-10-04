@@ -3,6 +3,7 @@ package main
 import (
         "fmt"
         "log"
+        "strconv"
 
         "github.com/hashicorp/terraform-plugin-sdk/helper/schema"
         "github.com/namedotcom/go/namecom"
@@ -16,6 +17,11 @@ func resourceNamedotcomRecord() *schema.Resource {
                 Delete: resourceNamedotcomRecordDelete,
 
                 Schema: map[string]*schema.Schema{
+                        "record_id": {
+                            Type:     schema.TypeString,
+                            Optional: true,
+                            Computed: true,
+                        },
                         "domain_name": {
                             Type:     schema.TypeString,
                             Required: true,
@@ -65,23 +71,45 @@ func makeClient (d *schema.ResourceData) (*namecom.NameCom, error) {
 }
 
 func resourceNamedotcomRecordCreate(d *schema.ResourceData, meta interface{}) error {
+    client, _ := makeClient(d)
+    domainName := d.Get("domain_name").(string)
+    host := ""
+    hostValue, hostOk := d.GetOk("host"); if hostOk {
+        host = hostValue.(string)
+    }
+    record_type := d.Get("type").(string)
+    answer := d.Get("answer").(string)
+
+    record, err := client.CreateRecord(&namecom.Record{
+        DomainName: domainName,
+        Host: host,
+        Type: record_type,
+        Answer: answer,
+    })
+
+    if err != nil {
+        return fmt.Errorf("Failed to create record: %s", err)
+    }
+
+    d.SetId(record.Fqdn)
+    d.Set("record_id", fmt.Sprintf("%v", record.ID))
+
     return resourceNamedotcomRecordRead(d, meta)
 }
 
 func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
     client, _ := makeClient(d)
     domainName := d.Get("domain_name").(string)
-    id := d.Get("id").(int32)
+    id, _ := strconv.ParseInt(d.Get("record_id").(string), 10, 32) //, 10, 32)
 
     record, _ := client.GetRecord(&namecom.GetRecordRequest{
         DomainName: domainName,
-        ID: id,
+        ID: int32(id),
     })
 
-    d.SetId(fmt.Sprintf("%v", record.ID))
+    d.SetId(record.Fqdn)
     d.Set("domain_name", record.DomainName)
-    d.Set("host", record.DomainName)
-    d.Set("fqdn", record.Fqdn)
+    d.Set("host", record.Host)
     d.Set("type", record.Type)
     d.Set("answer", record.Answer)
     d.Set("ttl", record.TTL)

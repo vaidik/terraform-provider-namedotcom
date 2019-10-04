@@ -102,10 +102,15 @@ func resourceNamedotcomRecordRead(d *schema.ResourceData, m interface{}) error {
     domainName := d.Get("domain_name").(string)
     id, _ := strconv.ParseInt(d.Get("record_id").(string), 10, 32) //, 10, 32)
 
-    record, _ := client.GetRecord(&namecom.GetRecordRequest{
+    record, err := client.GetRecord(&namecom.GetRecordRequest{
         DomainName: domainName,
         ID: int32(id),
     })
+
+    if err != nil {
+        d.SetId("")
+        return nil
+    }
 
     d.SetId(record.Fqdn)
     d.Set("domain_name", record.DomainName)
@@ -123,5 +128,19 @@ func resourceNamedotcomRecordUpdate(d *schema.ResourceData, m interface{}) error
 }
 
 func resourceNamedotcomRecordDelete(d *schema.ResourceData, m interface{}) error {
-        return nil
+    client, _ := makeClient(d)
+    domainName := d.Get("domain_name").(string)
+    id, _ := strconv.ParseInt(d.Get("record_id").(string), 10, 32) //, 10, 32)
+
+    _, err := client.DeleteRecord(&namecom.DeleteRecordRequest{
+        DomainName: domainName,
+        ID: int32(id),
+    })
+
+    if err != nil {
+        return fmt.Errorf("Failed to destroy the resource", err)
+    }
+
+    d.SetId("") // Explicitly destroy the resource
+    return nil
 }

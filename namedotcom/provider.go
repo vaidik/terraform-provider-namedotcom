@@ -1,4 +1,4 @@
-package main
+package namedotcom
 
 import (
         "github.com/hashicorp/terraform-plugin-sdk/terraform"

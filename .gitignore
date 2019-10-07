@@ -1,5 +1,7 @@
 terraform-provider-namedotcom
 .terraform
+*.tfstate*
+crash.log
 
 # Binaries for programs and plugins
 *.exe

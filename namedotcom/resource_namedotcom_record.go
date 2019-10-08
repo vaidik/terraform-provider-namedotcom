@@ -31,7 +31,7 @@ func resourceNamedotcomRecord() *schema.Resource {
 			},
 			"fqdn": {
 				Type:     schema.TypeString,
-				Optional: true,
+				Computed: true,
 			},
 			"type": {
 				Type:     schema.TypeString,
